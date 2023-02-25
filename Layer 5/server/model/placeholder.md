@@ -9,3 +9,11 @@ Types of models required for this project are:
 - Main ledger (going to be decentralized) (for this table, we only need two attributes: block# PK (created based on increment of previous highest block number), hash PK (created based on the information inside the block, including its previous hash), previousHash FK (taken from previous block number's hash), data (custom data, usually in a CHAR(10000)))
 - User variables (based on designated dApp) (for this table, we only need two attributes: wallet address PK, userInformation(encrypted into a string))
 - 
+
+
+Transaction table in MySQL
+- Has attribute for type of transaction, there are specific types:
+    - Wallet creation (generating genesis block for particular user)
+    - Money Transfer
+    - Create a tracked block (for borrowing)
+    - Create a smart contract (locking funds until conditions are met)

@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const mysql2 = require('mysql2');
+const { Keccak } = require('sha3');
 const router = express.Router();
 
 const db = mysql2.createConnection ({
@@ -76,15 +77,28 @@ db.query(`SELECT EXISTS (
 //      MAKE GENESIS BLOCK FOR EXAMPLE, only ADMIN can do this, and this endpoint just gets used once, whenever you start up.
 // });
 
-// router.get('/', async (req, res) => {
-//     console.log('hello');
-//      SEARCH FOR SPECIFIC BLOCK, only ADMIN can do this.
-// });
+router.get('/', async (req, res) => {
+    const hash = new Keccak(256);
+
+    hash.update('foo');
+    hash.digest('hex');
+    console.log(hash);
+    // Didn't actually check if this hash works
+     //SEARCH FOR SPECIFIC BLOCK, only ADMIN can do this.
+});
 
 function _generateHash(ownerAddress, information) {
     // Generate hash given information
-    // Base the hash on CryptoNight's hashing algorithm or something
+    // Base the hash on CryptoNight's hashing algorithm or something, pass to generateAlgo()
+    // Bring it back here and hash a custom combo for GVN
     // Make it possible for the information to be encrypted using ownerAddress's private key and to be decrypted by the ownerAddress's public key
+}
+
+function _generateEncryptionAlgorithm(data) {
+    // Taken from CryptoNight's hashing algorithm
+    // Doesn't use CryptoNight's algorithm I lied**
+    // I'm sorry it does use CryptoNight's algorithm hehe*** 2023-02-27
+    // Returns hash
 }
 
 function _createWallet(information) {
@@ -100,9 +114,16 @@ function _editWallet(walletObject, information) {
 }
 
 function _sendGVN(sendersAddress, amt) {
-    // Make a call to transaction object class to make object, return it here
+    // Make a call to transaction object class to make object, return it here, make transition object type to be money transfer
+    // Make call to transaction object class to make object, return it here, make transition object type to be smart contract with TRON network for binding coins from fiat to TRON, like ETH
+    // [use _smartRecordContract()] And the contract is linked to GVN currency as part of smart contract, and the smart contract's conditions will include the ability for when the user of a specific wallet address wishes to withdraw their wallet balance
     // Take transaction object and use it as a parameter for calling to another function called _createBlock to make the block, take that return object
     // add the block (returned object) to the record table (on the database)
+}
+
+function _sendTRON(sendersAddress, amt) {
+    // Same as sendGVN but on ERC network
+    // After making the block to database, then make a call to Tron for a smart contract
 }
 
 function _smartRecordContract(recipientAddress, senderAddress, condition) {
@@ -113,6 +134,7 @@ function _smartRecordContract(recipientAddress, senderAddress, condition) {
 
 function _borrowRecordContract(recipientAddress, senderAddress, condition) {
     // Make smartRecordContract method call here with special condition
+    // USE THIS METHOD TO MAKE SMART RECORD CONTRACT, for purchasing Tron tokens as GVN tokens are sent successfully to a wallet
 }
 
 function _searchBlocks(address_id) {

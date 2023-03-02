@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const mysql2 = require('mysql2');
+const fs = require('fs');
 const { Keccak } = require('sha3');
 const CryptoJS = require("crypto-js");
 const router = express.Router();
@@ -79,14 +80,41 @@ db.query(`SELECT EXISTS (
 // });
 
 router.get('/', async (req, res) => {
-    const hash = _generateEncryptionAlgorithm("check");
+    // Tests making the words
+    let words = selectRandomWordsFromFile('./model/1-1000.txt')
+    // Makes wallet object
+    const hash = _createWallet(null);
 
+    // Prints wallet object
+    console.log(hash);
     res.send(hash);
 
     
     // Didn't actually check if this hash works
      //SEARCH FOR SPECIFIC BLOCK, only ADMIN can do this.
 });
+
+// TEMPORARY
+function selectRandomWordsFromFile(filePath) {
+  // Read the file and split it into an array of words
+  const fileContent = fs.readFileSync(filePath, 'utf8');
+  const words = fileContent.split(/\s+/);
+
+  // Select 12 random words
+  const randomWords = [];
+  while (randomWords.length < 12) {
+    const randomIndex = Math.floor(Math.random() * words.length);
+    const randomWord = words[randomIndex];
+    if (!randomWords.includes(randomWord)) {
+      randomWords.push(randomWord);
+    }
+  }
+
+  // Return the array of random words
+  return randomWords;
+}
+
+
 
 function _generateHash(ownerAddress, information) {
     // Generate hash given information
@@ -145,6 +173,21 @@ function _generateEncryptionAlgorithm(data) {
 function _createWallet(information) {
     // Make a call to wallet object class to make object, return it here
     // add the returned object to the Wallet table in the database
+
+    //***NEEDS either null or 12-word array input */
+    
+    const Wallet = require('../middleware/walletObject');
+    
+    let makeWalletObject;
+    if (information === null) {
+        makeWalletObject = new Wallet();
+    } else if (information.length === 12) {
+        makeWalletObject = new Wallet(information);
+    } else {
+        throw new Error('Invalid information provided to create wallet');
+    }
+
+    return makeWalletObject;
 }
 
 function _editWallet(walletObject, information) {

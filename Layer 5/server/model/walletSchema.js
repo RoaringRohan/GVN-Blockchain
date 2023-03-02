@@ -1,6 +1,6 @@
 class walletSchema {
     constructor() {
-        db.query(`CREATE TABLE wallets (
+        db.query(`CREATE TABLE ledger.wallets (
             address_id VARCHAR(255) PRIMARY KEY,
             private_key VARCHAR(1000),
             public_key VARCHAR(1000),

@@ -1,6 +1,6 @@
 class recordSchema {
     constructor() {
-        db.query(`CREATE TABLE records (
+        db.query(`CREATE TABLE ledger.records (
             block_id INT PRIMARY KEY,
             hash VARCHAR(1000),
             prevHash VARCHAR(1000),

@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mysql2 = require('mysql2');
 const { Keccak } = require('sha3');
+const CryptoJS = require("crypto-js");
 const router = express.Router();
 
 const db = mysql2.createConnection ({
@@ -78,11 +79,11 @@ db.query(`SELECT EXISTS (
 // });
 
 router.get('/', async (req, res) => {
-    const hash = new Keccak(256);
+    const hash = _generateEncryptionAlgorithm("check");
 
-    hash.update('foo');
-    hash.digest('hex');
-    console.log(hash);
+    res.send(hash);
+
+    
     // Didn't actually check if this hash works
      //SEARCH FOR SPECIFIC BLOCK, only ADMIN can do this.
 });
@@ -98,7 +99,47 @@ function _generateEncryptionAlgorithm(data) {
     // Taken from CryptoNight's hashing algorithm
     // Doesn't use CryptoNight's algorithm I lied**
     // I'm sorry it does use CryptoNight's algorithm hehe*** 2023-02-27
+    // So basically it uses a few diff encryptions such as Keccak, AES, and some other algorithms.
     // Returns hash
+
+    const dataString = data.toString();
+
+    // First, we need to calculate the Keccak hash of the data input.
+    const keccakHash = CryptoJS.SHA3(dataString, { outputLength: 512 });
+
+    // Next, we take the first 31 bytes of the Keccak hash and use it as the AES encryption key.
+    const aesKey = keccakHash.toString().substring(0, 62); // We need 62 characters, since each character is represented by 2 hex digits.
+    const aesKeyBytes = CryptoJS.enc.Hex.parse(aesKey); // Converting the key to a byte array
+  
+    // Encrypting the first 31 bytes of the Keccak hash using AES-256
+    const encryptedKey = CryptoJS.AES.encrypt(
+        keccakHash.toString(),
+        aesKeyBytes,
+        { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7, keySize: 256 }
+    );
+  
+    // Encrypting the rest of the Keccak hash using AES-256
+    const encryptedHash = CryptoJS.AES.encrypt(
+        keccakHash.toString().substring(62),
+        aesKeyBytes,
+        { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7, keySize: 256 }
+    );
+  
+    // Combining the encrypted key and hash to form the CryptoNight workspace
+    const workspace = encryptedKey.toString() + encryptedHash.toString();
+  
+    // Applying the remaining hash functions (BLAKE-256, Groestl-256, JH-256 and Hank-256) to the workspace
+    const finalHash = CryptoJS.SHA3(workspace, {
+        outputLength: 256,
+        shakeLen: 256,
+    })
+        .concat(CryptoJS.SHA3(workspace, { outputLength: 256 }))
+        .concat(CryptoJS.RIPEMD160(workspace))
+        .concat(CryptoJS.SHA256(workspace))
+        .toString();
+  
+    // Return the final hash
+    return finalHash;
 }
 
 function _createWallet(information) {

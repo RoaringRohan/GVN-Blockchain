@@ -80,39 +80,16 @@ db.query(`SELECT EXISTS (
 // });
 
 router.get('/', async (req, res) => {
-    // Tests making the words
-    let words = selectRandomWordsFromFile('./model/1-1000.txt')
-    // Makes wallet object
-    const hash = _createWallet(null);
 
+    const hash = _createWallet();
+    console.log('done');
     // Prints wallet object
-    console.log(hash);
-    res.send(hash);
+    await res.sendStatus(200);
 
     
     // Didn't actually check if this hash works
      //SEARCH FOR SPECIFIC BLOCK, only ADMIN can do this.
 });
-
-// TEMPORARY
-function selectRandomWordsFromFile(filePath) {
-  // Read the file and split it into an array of words
-  const fileContent = fs.readFileSync(filePath, 'utf8');
-  const words = fileContent.split(/\s+/);
-
-  // Select 12 random words
-  const randomWords = [];
-  while (randomWords.length < 12) {
-    const randomIndex = Math.floor(Math.random() * words.length);
-    const randomWord = words[randomIndex];
-    if (!randomWords.includes(randomWord)) {
-      randomWords.push(randomWord);
-    }
-  }
-
-  // Return the array of random words
-  return randomWords;
-}
 
 
 
@@ -170,24 +147,54 @@ function _generateEncryptionAlgorithm(data) {
     return finalHash;
 }
 
-function _createWallet(information) {
+function _createWallet(personalData) {
     // Make a call to wallet object class to make object, return it here
     // add the returned object to the Wallet table in the database
 
-    //***NEEDS either null or 12-word array input */
-    
     const Wallet = require('../middleware/walletObject');
-    
-    let makeWalletObject;
-    if (information === null) {
+
+    if (personalData == null) {
+        console.log("no data submitted to blockchain wallet")
         makeWalletObject = new Wallet();
-    } else if (information.length === 12) {
-        makeWalletObject = new Wallet(information);
-    } else {
-        throw new Error('Invalid information provided to create wallet');
+    }
+    else if (personalData) {
+        console.log("submitting data to blockchain wallet");
+        makeWalletObject = new Wallet(personalData);
     }
 
-    return makeWalletObject;
+    return new Promise((resolve, reject) => {
+        makeWalletObject.init()
+            .then(() => {
+                const privateKey = makeWalletObject.getprivatekey();
+                const publicKey = makeWalletObject.getpublickey();
+                const data = makeWalletObject.getdata();
+                const balance = makeWalletObject.getbalance();
+                const linkedTransactions = makeWalletObject.getlinkedtransactions();
+
+                db.query('SELECT MAX(address_id) AS max_id FROM wallets', (error, results) => {
+                    if (error) {
+                      console.log(error);
+                    } else {
+                        const lastId = results[0].max_id || 0;
+                        const newId = lastId === 0 ? 1 : lastId + 1;
+                  
+                      // Insert the new tuple into the table
+                      db.query('INSERT INTO wallets (address_id, private_key, public_key, private_user_information, balance, linkedList) VALUES (?, ?, ?, ?, ?, ?)', [newId, privateKey, publicKey, data, balance, linkedTransactions], (error, results) => {
+                        if (error) {
+                          console.log(error);
+                        } else {
+                          console.log(`New tuple added with address_id ${newId}`);
+                        }
+                      });
+                    }
+                  });
+                
+                resolve(makeWalletObject);
+            })
+            .catch((err) => {
+                reject(err);
+            });
+    });
 }
 
 function _editWallet(walletObject, information) {
@@ -195,6 +202,15 @@ function _editWallet(walletObject, information) {
     // Take the old wallet information from database, de-parse that information into variables
     // Make call to _createWallet and make a new wallet object with the old information plus new changed info, return it here
     // Adjust the wallet's information on database with new object (if database coded correctly, Trigger should happen making new transaction and record block at the same time)
+
+    // wallet.init('{"PrivateKey": "my_private_key"}');
+
+    const Wallet = require('../middleware/walletObject');
+
+    if (information.PrivateKey && Array.isArray(information.PrivateKey) && information.PrivateKey.length === 12) {
+        makeWalletObject = new Wallet(information);
+    }
+
 }
 
 function _sendGVN(sendersAddress, amt) {

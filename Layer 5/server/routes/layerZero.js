@@ -13,7 +13,7 @@ const db = mysql2.createConnection ({
     database: 'ledger'
 })
 
-db.connect((err) => {
+db.connect((err) => {    
     if (err) {
         throw err;
     }
@@ -79,9 +79,15 @@ db.query(`SELECT EXISTS (
 //      MAKE GENESIS BLOCK FOR EXAMPLE, only ADMIN can do this, and this endpoint just gets used once, whenever you start up.
 // });
 
-router.get('/', async (req, res) => {
+router.get('/:data?', async (req, res) => {
+    if (req.params.data !== undefined && req.params.data !== null) {
+        const hash = await _createWallet(req.params.data);
+    }
+    else {
+        console.log("No data provided.")
+        const hash = await _createWallet("////////////");
+    }
 
-    const hash = _createWallet();
     console.log('done');
     // Prints wallet object
     await res.sendStatus(200);
@@ -152,52 +158,92 @@ function _createWallet(personalData) {
     // add the returned object to the Wallet table in the database
 
     const Wallet = require('../middleware/walletObject');
+    // const Transaction = require('../middleware/transactionObject');
+    const wallet = personalData ? new Wallet(personalData) : new Wallet();
+    
+    const promise1 = wallet.init().then(() => {
+        const privateKey = wallet.getprivatekey();
+        const publicKey = wallet.getpublickey();
+        const data = wallet.getdata();
+        const balance = wallet.getbalance();
+        const linkedTransactions = wallet.getlinkedtransactions();
+        const transactionPromise = _createTransaction("make", 100, publicKey, process.env.GVN, personalData);
 
-    if (personalData == null) {
-        console.log("no data submitted to blockchain wallet")
-        makeWalletObject = new Wallet();
-    }
-    else if (personalData) {
-        console.log("submitting data to blockchain wallet");
-        makeWalletObject = new Wallet(personalData);
-    }
-
-    return new Promise((resolve, reject) => {
-        makeWalletObject.init()
-            .then(() => {
-                const privateKey = makeWalletObject.getprivatekey();
-                const publicKey = makeWalletObject.getpublickey();
-                const data = makeWalletObject.getdata();
-                const balance = makeWalletObject.getbalance();
-                const linkedTransactions = makeWalletObject.getlinkedtransactions();
-
-                db.query('SELECT MAX(address_id) AS max_id FROM wallets', (error, results) => {
+        return transactionPromise.then((transaction) => {
+            if (transaction === true) {
+            console.log("go");
+            return new Promise((resolve, reject) => {
+                db.query(
+                'SELECT MAX(address_id) AS max_id FROM wallets',
+                (error, results) => {
                     if (error) {
-                      console.log(error);
+                    reject(error);
                     } else {
-                        const lastId = results[0].max_id || 0;
-                        const newId = lastId === 0 ? 1 : lastId + 1;
-                  
-                      // Insert the new tuple into the table
-                      db.query('INSERT INTO wallets (address_id, private_key, public_key, private_user_information, balance, linkedList) VALUES (?, ?, ?, ?, ?, ?)', [newId, privateKey, publicKey, data, balance, linkedTransactions], (error, results) => {
+                    const lastId = results[0].max_id || 0;
+                    const newId = lastId === 0 ? 1 : lastId + 1;
+
+                    db.query(
+                        'INSERT INTO wallets (address_id, private_key, public_key, private_user_information, balance, linkedList) VALUES (?, ?, ?, ?, ?, ?)',
+                        [
+                        newId,
+                        privateKey,
+                        publicKey,
+                        data,
+                        balance,
+                        linkedTransactions,
+                        ],
+                        (error, results) => {
                         if (error) {
-                          console.log(error);
+                            reject(error);
                         } else {
-                          console.log(`New tuple added with address_id ${newId}`);
+                            console.log(
+                            `New tuple added with address_id ${newId}`
+                            );
+                            resolve(wallet);
                         }
-                      });
+                        }
+                    );
                     }
-                  });
-                
-                resolve(makeWalletObject);
-            })
-            .catch((err) => {
-                reject(err);
+                }
+                );
             });
-    });
-}
+            } else {
+            console.log("redlight to add wallet to database");
+            return false;
+            }
+        });
+        });
+
+        return promise1;
+    }
+  
+    // const promise2 = promise1.then(() => {
+
+    //   if (personalData === null) {
+    //     const publicKey = wallet.getpublickey();
+    //     console.log("trying to do this")
+    //     const transaction = _createTransaction("make", 100, publicKey, process.env.GVN, "////////////");
+  
+    //   } else {
+    //     const publicKey = wallet.getpublickey();
+    //     const transaction = new Transaction("make", 100, publicKey, process.env.GVN, "personalData");
+  
+    //     // // transaction object's init is successful, it will return true
+    //     // if (transaction) {
+    //     //     // Make a call to record table in database, take the transaction object and add it to record table
+    //     //     _createBlock();
+    //     // }
+    //     // else {
+    //     //     return console.log('transaction object could not be created, try again');
+    //     // }
+    //   }
+    // });
+  
+    // return Promise.all([promise1, promise2]).then(() => true);
+
 
 function _editWallet(walletObject, information) {
+
     // Make a query to database for that entry in Wallet table for specific wallet
     // Take the old wallet information from database, de-parse that information into variables
     // Make call to _createWallet and make a new wallet object with the old information plus new changed info, return it here
@@ -212,6 +258,66 @@ function _editWallet(walletObject, information) {
     }
 
 }
+
+function _createTransaction(type, amtToSend, recipientAddress, senderAddress, transactionInfo) {
+    const Transaction = require('../middleware/transactionObject');
+    let transaction;
+    console.log(transactionInfo);
+    if (transactionInfo === null) {
+        console.log("attempting")
+        transaction = new Transaction(type, amtToSend, recipientAddress, senderAddress, 'not-verified');
+    } else {
+        console.log("attempting 2")
+        transaction = new Transaction(type, amtToSend, recipientAddress, senderAddress, transactionInfo);
+    }
+
+    console.log("got to here")
+    const promise = transaction.init().then(() => {
+        const accessToDatabase = transaction.getAccessToDatabase();
+        const transaction_id = transaction.getTransactionID();
+    
+        if (accessToDatabase) {
+            console.log('true access to database');
+            return _createBlock(transaction_id);
+
+        } else {
+            console.log('false access to database');
+            return false;
+        }
+    });
+    return promise;
+
+    // const accessToDatabase = transaction.getaccessToDatabase();
+    //       if (!accessToDatabase) {
+    //         console.log('false access to database');
+    //       } 
+    //       else {
+    //         console.log('true access to database');
+    //       }
+    //       return transaction;
+    // });
+}
+
+function _createBlock(transaction_id) {
+    return new Promise((resolve, reject) => {
+      if (transaction_id) {
+        db.query(
+          'INSERT INTO ledger.records (block_id, hash, prevHash, data) VALUES (?, ?, ?, ?)',
+          [transaction_id, '', '', ''],
+          (error, results) => {
+            if (error) {
+              reject(error);
+            } else {
+              console.log("successfully added to database of txid: " + transaction_id);
+              resolve(true);
+            }
+          }
+        );
+      } else {
+        reject("transaction_id is missing");
+      }
+    });
+  }
 
 function _sendGVN(sendersAddress, amt) {
     // Make a call to transaction object class to make object, return it here, make transition object type to be money transfer
@@ -230,6 +336,8 @@ function _smartRecordContract(recipientAddress, senderAddress, condition) {
     // Make call to transaction object class to make object, return it here
     // Make a block object based on transactions information, return block here
     // Create tuple in records table with new block added
+    
+
 }
 
 function _borrowRecordContract(recipientAddress, senderAddress, condition) {

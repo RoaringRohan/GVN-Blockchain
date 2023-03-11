@@ -5,7 +5,7 @@ let publickey;
 let data;
 let type;
 let lastedited;
-let balance;
+let balance = 0;
 let linkedtransactions;
 
 class Wallet {
@@ -32,9 +32,6 @@ class Wallet {
 
             // Creating a public key the user can use to deposit funds into their wallet with
             this.setpublickey();
-
-            // All new accounts will get 100 GVN coins free (to be used for gas by dApp developers)
-            this.setbalance(100);
 
             this.setlinkedtransactions(["1st transaction"]);
 

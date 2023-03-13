@@ -9,8 +9,6 @@ let gasFee = 0;
 let txID = "";
 let accessToDatabase;
 
-const Wallet = require('../middleware/walletObject');
-
 const Transaction = class {
     constructor(type, gvnAmount, receipientAddress, senderAddress, optionalData) {
         if (type === "make") {

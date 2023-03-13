@@ -79,7 +79,7 @@ db.query(`SELECT EXISTS (
 //      MAKE GENESIS BLOCK FOR EXAMPLE, only ADMIN can do this, and this endpoint just gets used once, whenever you start up.
 // });
 
-router.get('/:data?', async (req, res) => {
+router.get('/wallet/:data?', async (req, res) => {
     if (req.params.data !== undefined && req.params.data !== null) {
         const hash = await _createWallet(req.params.data);
     }
@@ -95,6 +95,12 @@ router.get('/:data?', async (req, res) => {
     
     // Didn't actually check if this hash works
      //SEARCH FOR SPECIFIC BLOCK, only ADMIN can do this.
+});
+
+router.get('/genesis', async (req, res) => {
+    const hash = await _createBlock(0, 'Genesis-block', 'No-previous-hash', '123');
+    console.log('done');
+    await res.sendStatus(200);
 });
 
 
@@ -298,12 +304,15 @@ function _createTransaction(type, amtToSend, recipientAddress, senderAddress, tr
     // });
 }
 
-function _createBlock(transaction_id) {
+function _createBlock(prevBlockNum, hash, prevHash, transaction_id) {
+    let increment = 0;
     return new Promise((resolve, reject) => {
       if (transaction_id) {
+        increment = prevBlockNum + 1;
+        
         db.query(
           'INSERT INTO ledger.records (block_id, hash, prevHash, data) VALUES (?, ?, ?, ?)',
-          [transaction_id, '', '', ''],
+          [increment, hash, prevHash, transaction_id],
           (error, results) => {
             if (error) {
               reject(error);

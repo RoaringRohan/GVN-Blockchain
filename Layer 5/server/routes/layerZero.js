@@ -4,6 +4,12 @@ const mysql2 = require('mysql2');
 const fs = require('fs');
 const { Keccak } = require('sha3');
 const CryptoJS = require("crypto-js");
+
+const LinkedList = require('../frameworks/linkedList');
+const Wallet = require('../middleware/walletObject');
+const Transaction = require('../middleware/transactionObject');
+const Block = require('../middleware/blockObject');
+
 const router = express.Router();
 
 const db = mysql2.createConnection ({
@@ -36,7 +42,7 @@ db.query(`SELECT EXISTS (
         let check = JSON.stringify(results).slice(-3, -2);
         
         if (check == '0') {
-            const WalletSchema = require('../model/walletSchema');
+            const WalletSchema = require('../models/walletSchema');
             let makeWalletSchema = new WalletSchema();
         }
 
@@ -59,7 +65,7 @@ db.query(`SELECT EXISTS (
         let check = JSON.stringify(results).slice(-3, -2);
         
         if (check == '0') {
-            const RecordSchema = require('../model/recordSchema');
+            const RecordSchema = require('../models/recordSchema');
             let makeRecordSchema = new RecordSchema();
         }
 
@@ -97,19 +103,35 @@ router.get('/wallet/:data?', async (req, res) => {
      //SEARCH FOR SPECIFIC BLOCK, only ADMIN can do this.
 });
 
-router.get('/genesis', async (req, res) => {
-    const hash = await _createBlock(0, 'Genesis-block', 'No-previous-hash', '123');
+router.get('/', async (req, res) => {
+    const hash = await _createWallet();
     console.log('done');
     await res.sendStatus(200);
 });
 
-
+router.get('/genesis', async (req, res) => {
+    db.query(
+        'INSERT INTO ledger.records (block_id, hash, prevHash, data) VALUES (?, ?, ?, ?)',
+        [0, 'Genesis-block', 'No-previous-hash', '123'],
+        (error, results) => {
+          if (error) {
+            console.error(error);
+          } else {
+            console.log('Tuple inserted successfully');
+          }
+        }
+      );
+    console.log('done');
+    await res.sendStatus(200);
+});
 
 function _generateHash(ownerAddress, information) {
     // Generate hash given information
     // Base the hash on CryptoNight's hashing algorithm or something, pass to generateAlgo()
     // Bring it back here and hash a custom combo for GVN
     // Make it possible for the information to be encrypted using ownerAddress's private key and to be decrypted by the ownerAddress's public key
+    const temp = _generateEncryptionAlgorithm("testing data");
+    return temp;
 }
 
 function _generateEncryptionAlgorithm(data) {
@@ -162,8 +184,6 @@ function _generateEncryptionAlgorithm(data) {
 function _createWallet(personalData) {
     // Make a call to wallet object class to make object, return it here
     // add the returned object to the Wallet table in the database
-
-    const Wallet = require('../middleware/walletObject');
     // const Transaction = require('../middleware/transactionObject');
     const wallet = personalData ? new Wallet(personalData) : new Wallet();
     
@@ -173,7 +193,8 @@ function _createWallet(personalData) {
         const data = wallet.getdata();
         const balance = wallet.getbalance();
         const linkedTransactions = wallet.getlinkedtransactions();
-        const transactionPromise = _createTransaction("make", 100, publicKey, process.env.GVN, personalData);
+        console.log(personalData);
+        const transactionPromise = _createTransaction("make", 100, publicKey, process.env.GVN, "creatingwall");
 
         return transactionPromise.then((transaction) => {
             if (transaction === true) {
@@ -266,7 +287,6 @@ function _editWallet(walletObject, information) {
 }
 
 function _createTransaction(type, amtToSend, recipientAddress, senderAddress, transactionInfo) {
-    const Transaction = require('../middleware/transactionObject');
     let transaction;
     console.log(transactionInfo);
     if (transactionInfo === null) {
@@ -274,6 +294,7 @@ function _createTransaction(type, amtToSend, recipientAddress, senderAddress, tr
         transaction = new Transaction(type, amtToSend, recipientAddress, senderAddress, 'not-verified');
     } else {
         console.log("attempting 2")
+        console.log(transactionInfo);
         transaction = new Transaction(type, amtToSend, recipientAddress, senderAddress, transactionInfo);
     }
 
@@ -282,9 +303,12 @@ function _createTransaction(type, amtToSend, recipientAddress, senderAddress, tr
         const accessToDatabase = transaction.getAccessToDatabase();
         const transaction_id = transaction.getTransactionID();
     
+        const linkedList = new LinkedList();
+        linkedList.add(transaction_id);
+
         if (accessToDatabase) {
             console.log('true access to database');
-            return _createBlock(transaction_id);
+            return _createBlock(recipientAddress, linkedList);
 
         } else {
             console.log('false access to database');
@@ -304,27 +328,64 @@ function _createTransaction(type, amtToSend, recipientAddress, senderAddress, tr
     // });
 }
 
-function _createBlock(prevBlockNum, hash, prevHash, transaction_id) {
-    let increment = 0;
+function _createBlock(recipientAddress, listOfTransactions) {
     return new Promise((resolve, reject) => {
-      if (transaction_id) {
-        increment = prevBlockNum + 1;
-        
+        let string;
+
+        if (listOfTransactions.size <= 2) {
+            //Make miner reward small
+            string = listOfTransactions.toString();
+        } 
+        else if (listOfTransactions.size === 3) {
+            //Make miner reward medium
+            string = listOfTransactions.toString();
+        } 
+        else if (listOfTransactions.size === 4) {
+            //Make miner reward large
+            string = listOfTransactions.toString();
+        } 
+        else {
+            reject("transactions is missing");
+        }
+
+        const hash = _generateHash(recipientAddress, string);
+
         db.query(
-          'INSERT INTO ledger.records (block_id, hash, prevHash, data) VALUES (?, ?, ?, ?)',
-          [increment, hash, prevHash, transaction_id],
-          (error, results) => {
-            if (error) {
-              reject(error);
-            } else {
-              console.log("successfully added to database of txid: " + transaction_id);
-              resolve(true);
+            'SELECT block_id, prevHash FROM ledger.records WHERE block_id = (SELECT MAX(block_id) FROM ledger.records);',
+            (error, results) => {
+                if (error) {
+                    reject(error);
+                } else {
+                    // Add 1 to the max block ID to get the next block ID
+                    const highestBlockId = results[0].block_id;
+                    const prevHash = results[0].prevHash;
+        
+                    const block = new Block(highestBlockId + 1, hash, prevHash, listOfTransactions);
+        
+                    const promise = block.init().then(() => {
+                        const getblocknum = block.getblocknum();
+                        console.log(getblocknum);
+                        const getblockhash = block.getblockhash();
+                        console.log(getblockhash);
+                        const getblockprevhash = block.getprevhash();
+                        console.log(getblockprevhash);
+        
+                        db.query(
+                            'INSERT INTO ledger.records (block_id, hash, prevHash, data) VALUES (?, ?, ?, ?)',
+                            [getblocknum, getblockhash, getblockprevhash, string],
+                            (error, results) => {
+                                if (error) {
+                                    reject(error);
+                                } else {
+                                    console.log("successfully added to database of block #: " + getblocknum);
+                                    resolve(true);
+                                }
+                            }
+                        );
+                    });
+                }
             }
-          }
         );
-      } else {
-        reject("transaction_id is missing");
-      }
     });
   }
 
@@ -354,8 +415,13 @@ function _borrowRecordContract(recipientAddress, senderAddress, condition) {
     // USE THIS METHOD TO MAKE SMART RECORD CONTRACT, for purchasing Tron tokens as GVN tokens are sent successfully to a wallet
 }
 
-function _searchBlocks(address_id) {
+function _searchBlocksbyID() {
     // Search records table for any tuples where 'address_id' was used, create a linked list and return
+
+}
+
+function _searchBlocksbyTransactionID() {
+
 }
 
 module.exports = router;

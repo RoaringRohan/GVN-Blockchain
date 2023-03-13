@@ -1,4 +1,5 @@
 const fs = require('fs');
+const LinkedList = require('../frameworks/linkedList');
 
 let privatekey;
 let publickey;
@@ -6,7 +7,7 @@ let data;
 let type;
 let lastedited;
 let balance = 0;
-let linkedtransactions;
+let linkedtransactions = new LinkedList();
 
 class Wallet {
     constructor(data) {
@@ -27,12 +28,16 @@ class Wallet {
 
     init() {
         return new Promise((resolve, reject) => {
+            // Add 100 coins to wallet on initialization
+            this.addbalance(100);
+
             // Creating 12-word mnemonic for user to remember and sign in with wallet
-            this.setprivatekey('./model/1-1000.txt');
+            this.setprivatekey('./models/1-1000.txt');
 
             // Creating a public key the user can use to deposit funds into their wallet with
             this.setpublickey();
 
+            
             this.setlinkedtransactions(["1st transaction"]);
 
             this.lasteditedon();
@@ -85,12 +90,34 @@ class Wallet {
         return this.data;
     }
 
-    setbalance(balance) {
-        this.balance = balance;
+    addbalance(amtToAdd) {
+        this.balance = balance + amtToAdd;
+        return true;
+    }
+
+    subtractbalance(amtToSubtract) {
+        const check = this.checkforsubtractablebalance(amtToSubtract);
+        if (check === true) {
+            this.balance = balance - amtToSubtract;
+            return true;
+        }
+        else {
+            console.log("Not enough balance to subtract");
+            return false;
+        }
     }
 
     getbalance() {
         return this.balance;
+    }
+
+    checkforsubtractablebalance(amtToSubtract) {
+        if (this.balance > amtToSubtract) {
+            return true;
+        }
+        else {
+            return false;
+        }
     }
 
     getlinkedtransactions() {

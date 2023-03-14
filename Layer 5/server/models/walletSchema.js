@@ -6,7 +6,8 @@ class walletSchema {
             public_key VARCHAR(1000),
             private_user_information VARCHAR(1000),
             balance DECIMAL(17, 7),
-            linkedList VARCHAR(5000)
+            transactions VARCHAR(5000),
+            last_edited_on VARCHAR(50)
           );`, (err, results) => {
             if (err) return console.log("Error making Wallet Schema.");
             return console.log("Wallet Schema created.")

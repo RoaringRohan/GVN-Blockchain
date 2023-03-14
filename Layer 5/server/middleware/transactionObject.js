@@ -73,8 +73,10 @@ const Transaction = class {
             // return gas fee only method
             // return transaction id
 
-
+            console.log("working here")
             this.verifyGVNTransaction(this.data);
+            console.log("working here")
+            console.log(this.accessToDatabase)
             switch(this.type) {
                 case 0:
                     this.makeTransactionID(this.getgassFee(), this.data);

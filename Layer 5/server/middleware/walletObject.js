@@ -57,40 +57,8 @@ class Wallet {
             if (transaction === true) {
             console.log("go");
             return new Promise((resolve, reject) => {
-                // db.query(
-                // 'SELECT MAX(address_id) AS max_id FROM wallets',
-                // (error, results) => {
-                //     if (error) {
-                //     reject(error);
-                //     } else {
-                //     const lastId = results[0].max_id || 0;
-                //     const newId = lastId === 0 ? 1 : lastId + 1;
 
-                //     db.query(
-                //         'INSERT INTO wallets (address_id, private_key, public_key, private_user_information, balance, transactions) VALUES (?, ?, ?, ?, ?, ?)',
-                //         [
-                //         newId,
-                //         this.getprivatekey(),
-                //         this.getpublickey(),
-                //         this.getdata(),
-                //         this.getbalance(),
-                //         this.getlinkedtransactions(),
-                //         ],
-                //         (error, results) => {
-                //         if (error) {
-                //             reject(error);
-                //         } else {
-                //             console.log(
-                //             `New tuple added with address_id ${newId}`
-                //             );
-                //         }
-                //         }
-                //     );
-                //     }
-                // }
-                // );
-
-                this.makeDBquery(1)
+                this.makeDBquery(2)
             });
             } else {
             console.log("redlight to add wallet to database");
@@ -100,6 +68,19 @@ class Wallet {
         });
     }
   
+    fillObject(key, type) {
+        return new Promise((resolve, reject) => {
+            if (type === "recipient") {
+                this.publickey = key;
+            }
+            else if (type === "sender") {
+                this.privatekey = key;
+            }
+            this.makeDBquery(10);
+            resolve();
+        });
+    }
+
     _createTransaction(type, amtToSend, recipientAddress, senderAddress, transactionInfo) {
         let transaction;
         console.log(transactionInfo);
@@ -287,6 +268,7 @@ class Wallet {
     setpublickey(privatekey) {
         // Code to generate a private key from the 12 words
         // ******DO EVENTUALLY****
+        let hash = new Hash()
         this.publickey = 'public key (0xonweorinvwpnqd....)';
 
         return publickey;
@@ -375,20 +357,39 @@ class Wallet {
                         if (error) {
                             reject(error);
                         } else {
-                            console.log(
-                            `New tuple added with address_id ${newId}`
-                            );
+                            console.log(`New tuple added with address_id ${newId}`);
                         }
                         }
                     );
                     }
                 }
-                );
+            );
         }
 
-        // Update transactionlist in database amd balance
+        // Update transactionlist in database amd balance ---- TURN INTO GENESIS for moving from DAO wallet to private wallet only during creation of wallet
         if (input === 2) {
             console.log("changing balances")
+            db.query(
+                'UPDATE wallets SET balance = ?, transactions = ? WHERE public_key = ?',
+                [
+                    this.getbalance(),
+                    this.getlinkedtransactions(),
+                    this.getpublickey(),
+                ],
+                (error, results) => {
+                    if (error) {
+                        console.log("cannot find public key to update wallet balance")
+                        reject(error);
+                    } else {
+                        console.log(`Tuple with public key ${this.getpublickey()} updated successfully:`);
+                        console.log(`Private key: ${this.getprivatekey()}`);
+                        console.log(`Public key: ${this.getpublickey()}`);
+                        console.log(`Private user information: ${this.getdata()}`);
+                        console.log(`Balance: ${this.getbalance()}`);
+                        console.log(`Transactions: ${this.getlinkedtransactions()}`);
+                    }
+                }
+            );
         }
 
         // Edit a wallet (private_user_information)
@@ -403,7 +404,24 @@ class Wallet {
 
         // Find wallet in database and fill this class with object's data from database
         if (input == 10) {
-
+            db.query(
+                'SELECT * FROM wallets WHERE public_key = ? OR private_key = ? LIMIT 1',
+                [
+                    this.getpublickey(),
+                    this.getprivatekey()
+                ],
+                (error, results) => {
+                    if (error) {
+                        reject(error);
+                    } else if (results.length === 0) {
+                        console.log('No matching wallet found');
+                    } else {
+                        const wallet = results[0];
+                        console.log(`Wallet found: ${JSON.stringify(wallet)}`);
+                        // Access attributes of the wallet tuple here
+                    }
+                }
+            );
         }
     }
 }

@@ -1,3 +1,5 @@
+const Wallet = require('../middleware/walletObject');
+
 // Use this class to make sure that an object is created correctly and conforms to the rules described here, then send the object back to the respective class
 
 let type;
@@ -73,6 +75,22 @@ const Transaction = class {
             // return gas fee only method
             // return transaction id
 
+            // // Making wallet objects, setting private/public keys, retrieving balance, checking if transaction is possible, then verify transaction, makeID, and send txID to block object class
+            // let recipientWallet = new Wallet("////////////");
+            // let senderWallet = new Wallet("////////////");
+
+            // const promise1 = recipientWallet.fillObject().then(() => {
+            //     // const privateKey = wallet.getprivatekey();
+            //     // const publicKey = wallet.getpublickey();
+            //     // const data = wallet.getdata();
+            //     // const balance = wallet.getbalance();
+            //     // const linkedTransactions = wallet.getlinkedtransactions();
+            //     console.log("recip Wallet created with data being : ");
+                
+        
+            //     return promise1;
+            // });
+
             console.log("working here")
             this.verifyGVNTransaction(this.data);
             console.log("working here")
@@ -90,6 +108,8 @@ const Transaction = class {
                 default:
                     throw new Error("Invalid transaction type");
             }
+
+
 
             resolve();
         });
